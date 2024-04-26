@@ -1,0 +1,8 @@
+build/*
+ext/cache/*
+CMakeLists.txt.user
+.gcode
+output/
+.idea/*
+cmake-build-debug/*
+cmake-build-release/*
