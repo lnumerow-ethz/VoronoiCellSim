@@ -15,12 +15,12 @@ For now we only provide support on Linux machines. The given instructions are fo
     sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
     sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
     
-> $ sed -i -e '/experimental/ s/^#//g' /etc/apt/sources.list.d/nvidia-container-toolkit.list
+> $ sudo sed -i -e '/experimental/ s/^#//g' /etc/apt/sources.list.d/nvidia-container-toolkit.list
 
 > $ sudo apt-get update \
     && sudo apt-get install -y nvidia-container-toolkit
 
-> $ nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+> $ sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
 
 > $ sudo nvidia-ctk runtime configure --runtime=docker
 
