@@ -37,7 +37,7 @@ if (CUDA_FOUND)
     add_definitions(-DENABLE_AMGCL_CUDA)
 endif ()
 
-set(MKLROOT "/opt/intel/oneapi/mkl/2024.1")
+set(MKLROOT "/opt/intel/oneapi/mkl/2024.2")
 add_definitions(-DEIGEN_USE_MKL_ALL)
 add_definitions(-DMKL_LP64)
 add_definitions(-DUSE_CHOLMOD)
