@@ -121,18 +121,9 @@ void FoamSubApp2D::getViewerData(std::vector<CRLViewerData> &viewer_data, CRLCam
 void FoamSubApp2D::initializeSubApp() {
     experiment_selector.second.clear();
     experiment_selector.second.emplace_back(std::make_shared<NoExperimentSelected>());
-    experiment_selector.second.emplace_back(std::make_shared<ExperimentCoarsening2D>());
-    experiment_selector.second.emplace_back(std::make_shared<ExperimentConvergenceTest2D>());
-    experiment_selector.second.emplace_back(std::make_shared<ExperimentRigidBody2D>());
-    experiment_selector.second.emplace_back(std::make_shared<ExperimentDCMComparison2D>());
-    experiment_selector.second.emplace_back(std::make_shared<ExperimentImageMatch2D>());
-    experiment_selector.second.emplace_back(std::make_shared<ExperimentRuntimeScaling2D>());
 
     scenario_selector.second.clear();
     scenario_selector.second.push_back(std::make_shared<RandomSitesInBox2D>());
-    scenario_selector.second.push_back(std::make_shared<RandomSitesInMembrane2D>());
-    scenario_selector.second.push_back(std::make_shared<ConvergenceTest2D>());
-    scenario_selector.second.push_back(std::make_shared<RigidBody2D>());
     scenario_selector.second[scenario_selector.first]->assignScenario(model_definition, degrees_of_freedom);
 
     tessellation_selector.second.clear();
