@@ -54,8 +54,8 @@ void FoamSubApp::setDynamicsMatrices() {
     int dims_space = model_definition.boundary_generator->getDims();
     int dims_site_params_free = model_definition.site_free_param_indices.rows();
     int dims_c = dims_space + dims_site_params_free;
-    int n_sites = degrees_of_freedom.sites.size();
-    int nc = degrees_of_freedom.sites.size() * dims_c;
+    int n_sites = degrees_of_freedom.sites.size() / 25;
+    int nc = n_sites * dims_c;
     int np = model_definition.boundary_free_param_indices.rows();
     int num_dof = nc + np;
 

@@ -162,12 +162,13 @@ void TessellationGenerator::getNodeTriplets(const Model &model, TessellationDeri
 
                 for (const NodeDependency &dependency0 : node_dependencies) {
                     switch (dependency0.type) {
-                        case NODE_GEN_SITE:
+                        case NODE_GEN_SITE: {
+                            int overall_idx_0 = dependency0.overall_idx % (model.dimensions_ind->n_sites / 25);
                             for (int i = 0; i < dims_x; i++) {
                                 for (int j = 0; j < dims_c_tess; j++) {
                                     if (c_index_map(j) == -1) continue;
                                     local_triplets_dxdc.emplace_back(node_idx * dims_x + i,
-                                                                     dependency0.overall_idx * dims_c + c_index_map(j),
+                                                                     overall_idx_0 * dims_c + c_index_map(j),
                                                                      data.grad(i, dependency0.node_data_idx + j));
                                 }
                             }
@@ -176,30 +177,34 @@ void TessellationGenerator::getNodeTriplets(const Model &model, TessellationDeri
                                 for (const NodeDependency &dependency1 : node_dependencies) {
                                     switch (dependency1.type) {
                                         case NODE_GEN_SITE:  /// Two site dependencies
+                                        {
+                                            int overall_idx_1 =
+                                                dependency1.overall_idx % (model.dimensions_ind->n_sites / 25);
                                             for (int i = 0; i < dims_x; i++) {
                                                 for (int j = 0; j < dims_c_tess; j++) {
                                                     if (c_index_map(j) == -1) continue;
-                                                    int row = dependency0.overall_idx * dims_c + c_index_map(j);
+                                                    int row = overall_idx_0 * dims_c + c_index_map(j);
                                                     for (int k = 0; k < dims_c_tess; k++) {
                                                         if (c_index_map(k) == -1) continue;
-                                                        int col = dependency1.overall_idx * dims_c + c_index_map(k);
+                                                        int col = overall_idx_1 * dims_c + c_index_map(k);
                                                         if (col < row) continue;  /// Only store upper triangular.
                                                         triplets.d2xdc2[node_idx * dims_x + i].emplace_back(
-                                                            dependency0.overall_idx * dims_c + c_index_map(j),
-                                                            dependency1.overall_idx * dims_c + c_index_map(k),
+                                                            overall_idx_0 * dims_c + c_index_map(j),
+                                                            overall_idx_1 * dims_c + c_index_map(k),
                                                             data.hess[i](dependency0.node_data_idx + j,
                                                                          dependency1.node_data_idx + k));
                                                     }
                                                 }
                                             }
                                             break;
+                                        }
                                         case NODE_GEN_BVERTEX:  /// One site and one boundary vertex dependency
                                             for (int i = 0; i < dims_x; i++) {
                                                 for (int j = 0; j < dims_c_tess; j++) {
                                                     for (int k = 0; k < dims_v; k++) {
                                                         if (c_index_map(j) == -1) continue;
                                                         triplets.d2xdcdv[node_idx * dims_x + i].emplace_back(
-                                                            dependency0.overall_idx * dims_c + c_index_map(j),
+                                                            overall_idx_0 * dims_c + c_index_map(j),
                                                             dependency1.overall_idx * dims_v + k,
                                                             data.hess[i](dependency0.node_data_idx + j,
                                                                          dependency1.node_data_idx + k));
@@ -212,6 +217,7 @@ void TessellationGenerator::getNodeTriplets(const Model &model, TessellationDeri
                             }
 
                             break;
+                        }
                         case NODE_GEN_BVERTEX:
                             for (int i = 0; i < dims_x; i++) {
                                 for (int j = 0; j < dims_v; j++) {
@@ -262,7 +268,7 @@ void TessellationGenerator::constructMatricesFromTriplets(Model &model, Tessella
     int nv = model.dimensions_boundary->nv;
     int np = model.dimensions_ind->np;
 
-    model.derivative_matrices.dxdc.resize(nx, nc);
+    model.derivative_matrices.dxdc.resize(nx, nc / 25);
     model.derivative_matrices.dxdv.resize(nx, nv);
     model.derivative_matrices.dvdp.resize(nv, np);
 

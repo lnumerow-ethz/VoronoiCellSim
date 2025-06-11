@@ -2,6 +2,8 @@
 #include "Projects/VoronoiFoam/include/Model/Boundary/BoundaryGenerator.h"
 #include "Projects/VoronoiFoam/include/Model/Tessellation/TessellationGenerator.h"
 
+#include "CRLHelper/PeriodicHelper.h"
+
 VectorXI ModelHelper::getBoundaryParamReverseIndexVector(const Model &model) {
     VectorXI free_index = VectorXI::Constant(model.degrees_of_freedom.boundary_param.rows(), -1);
     for (int i = 0; i < model.model_definition.boundary_free_param_indices.rows(); i++) {
@@ -15,7 +17,7 @@ void ModelHelper::getDOFVector(const ModelDefinition &model_definition, const De
     int dims_space = model_definition.boundary_generator->getDims();
     int n_site_free_param = model_definition.site_free_param_indices.rows();
     int dims_c = n_site_free_param + dims_space;
-    int n_sites = (int)model_dof.sites.size();
+    int n_sites = (int)model_dof.sites.size() / 25;
     int nc = n_sites * dims_c;
     int np = (int)model_definition.boundary_free_param_indices.rows();
 
@@ -37,15 +39,20 @@ void ModelHelper::setDOFFromVector(const ModelDefinition &model_definition, Degr
     int dims_space = model_definition.boundary_generator->getDims();
     int n_site_free_param = model_definition.site_free_param_indices.rows();
     int dims_c = n_site_free_param + dims_space;
-    int n_sites = (int)model_dof.sites.size();
+    int n_sites = (int)model_dof.sites.size() / 25;
     int nc = n_sites * dims_c;
     int np = (int)model_definition.boundary_free_param_indices.rows();
 
+    MatrixXI tiles = PeriodicHelper::getPeriodicTiles(2, 2, true, true);
+
     for (int i = 0; i < n_sites; i++) {
-        model_dof.sites[i].pos = dof_vector.segment(i * dims_c, dims_space);
-        for (int j = 0; j < n_site_free_param; j++) {
-            model_dof.sites[i].param(model_definition.site_free_param_indices(j)) =
-                dof_vector(i * dims_c + dims_space + j);
+        for (int j = 0; j < tiles.rows(); j++) {
+            model_dof.sites[i + j * n_sites].pos = dof_vector.segment(i * dims_c, dims_space);
+            model_dof.sites[i + j * n_sites].pos += Vector2F(2 * tiles(j, 0), 2 * tiles(j, 1));
+            for (int j = 0; j < n_site_free_param; j++) {
+                model_dof.sites[i + j * n_sites].param(model_definition.site_free_param_indices(j)) =
+                    dof_vector(i * dims_c + dims_space + j);
+            }
         }
     }
     for (int i = 0; i < np; i++) {

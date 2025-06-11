@@ -102,7 +102,11 @@ void FoamSubApp2D::getViewerData(std::vector<CRLViewerData> &viewer_data, CRLCam
     srand(0);  // NOLINT (suppress Clang-Tidy warning about pseudo-randomness)
     MatrixXF colors(n_sites, 3);
     for (int i = 0; i < n_sites; i++) {
-        colors.row(i) = 0.5 * (Vector3F::Random() + Vector3F::Ones());
+        if (i < n_sites / 25) {
+            colors.row(i) = 0.5 * (Vector3F::Random() + Vector3F::Ones());
+        } else {
+            colors.row(i) = Vector3F::Ones();
+        }
     }
 
     /// Obtain a triangulation of the cells in 'mesh' and assign color to each triangle according to cell index.

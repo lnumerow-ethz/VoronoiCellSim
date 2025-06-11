@@ -138,7 +138,7 @@ static void addTripletsParallel_mul_A_B_C_blockOffsetTriangular(tbb::concurrent_
 
 void PotentialEnergy::computePotentialEnergy(const Model &model, F &energy, VectorXF &gradient, HessianF &hessian,
                                              int order) {
-    int nc = model.dimensions_ind->nc;
+    int nc = model.dimensions_ind->nc / 25;
     int np = model.dimensions_ind->np;
     int nx = model.dimensions_tess->nx;
     int nv = model.dimensions_boundary->nv;
@@ -157,91 +157,92 @@ void PotentialEnergy::computePotentialEnergy(const Model &model, F &energy, Vect
 
     /// This usage of parallel_for (with blocked range and local vectors) doesn't make much any difference on my
     /// laptop, but it's way faster on the cluster.
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, model.cells.size()), [&](const tbb::blocked_range<size_t> &range) {
-        TripletListF local_triplets_dFdx;
-        TripletListF local_triplets_dFdc;
-        TripletListF local_triplets_d2Fdc2;
-        TripletListF local_triplets_d2Fdcdx;
-        TripletListF local_triplets_d2Fdx2;
+    tbb::parallel_for(
+        tbb::blocked_range<size_t>(0, model.cells.size() / 25), [&](const tbb::blocked_range<size_t> &range) {
+            TripletListF local_triplets_dFdx;
+            TripletListF local_triplets_dFdc;
+            TripletListF local_triplets_d2Fdc2;
+            TripletListF local_triplets_d2Fdcdx;
+            TripletListF local_triplets_d2Fdx2;
 
-        for (size_t i = range.begin(); i != range.end(); ++i) {
-            const TessellationCell &cell = model.cells[i];
+            for (size_t i = range.begin(); i != range.end(); ++i) {
+                const TessellationCell &cell = model.cells[i];
 
-            PerCellValue cell_energy_value(model, cell, order);
-            model.model_definition.cell_energy_function->getValue(model, cell_energy_value);
+                PerCellValue cell_energy_value(model, cell, order);
+                model.model_definition.cell_energy_function->getValue(model, cell_energy_value);
 
-            cell_energies[cell.site_index] = cell_energy_value.value;
+                cell_energies[cell.site_index] = cell_energy_value.value;
 
-            /// Not necessary when order == 0, but putting here for clarity.
-            int num_nodes_in_cell = cell.node_indices_in_cell.size();
-            VectorXI nodes_in_cell(num_nodes_in_cell);
-            for (const auto &n : cell.node_indices_in_cell) {
-                nodes_in_cell(n.second) = n.first;
-            }
+                /// Not necessary when order == 0, but putting here for clarity.
+                int num_nodes_in_cell = cell.node_indices_in_cell.size();
+                VectorXI nodes_in_cell(num_nodes_in_cell);
+                for (const auto &n : cell.node_indices_in_cell) {
+                    nodes_in_cell(n.second) = n.first;
+                }
 
-            if (order >= 1) {
-                for (int i = 0; i < num_nodes_in_cell; i++) {
-                    for (int j = 0; j < dims_x; j++) {
-                        local_triplets_dFdx.emplace_back(nodes_in_cell(i) * dims_x + j, 0,
-                                                         cell_energy_value.gradient(i * dims_x + j));
+                if (order >= 1) {
+                    for (int i = 0; i < num_nodes_in_cell; i++) {
+                        for (int j = 0; j < dims_x; j++) {
+                            local_triplets_dFdx.emplace_back(nodes_in_cell(i) * dims_x + j, 0,
+                                                             cell_energy_value.gradient(i * dims_x + j));
+                        }
+                    }
+                    for (int i = 0; i < dims_c; i++) {
+                        local_triplets_dFdc.emplace_back(cell.site_index * dims_c + i, 0,
+                                                         cell_energy_value.gradient(num_nodes_in_cell * dims_x + i));
                     }
                 }
-                for (int i = 0; i < dims_c; i++) {
-                    local_triplets_dFdc.emplace_back(cell.site_index * dims_c + i, 0,
-                                                     cell_energy_value.gradient(num_nodes_in_cell * dims_x + i));
-                }
-            }
 
-            if (order >= 2) {
-                MatrixXF cell_energy_hessian = cell_energy_value.hessian.evalDense();
-                for (int ii = 0; ii < cell_energy_hessian.rows(); ii++) {
-                    for (int jj = 0; jj < cell_energy_hessian.cols(); jj++) {
-                        int node0_index_in_cell = std::min(ii / dims_x, num_nodes_in_cell);
-                        int node1_index_in_cell = std::min(jj / dims_x, num_nodes_in_cell);
-                        int i = ii - dims_x * node0_index_in_cell;
-                        int j = jj - dims_x * node1_index_in_cell;
+                if (order >= 2) {
+                    MatrixXF cell_energy_hessian = cell_energy_value.hessian.evalDense();
+                    for (int ii = 0; ii < cell_energy_hessian.rows(); ii++) {
+                        for (int jj = 0; jj < cell_energy_hessian.cols(); jj++) {
+                            int node0_index_in_cell = std::min(ii / dims_x, num_nodes_in_cell);
+                            int node1_index_in_cell = std::min(jj / dims_x, num_nodes_in_cell);
+                            int i = ii - dims_x * node0_index_in_cell;
+                            int j = jj - dims_x * node1_index_in_cell;
 
-                        if (node0_index_in_cell < num_nodes_in_cell) {
-                            int row = nodes_in_cell(node0_index_in_cell) * dims_x + i;
-                            if (node1_index_in_cell < num_nodes_in_cell) {
-                                int col = nodes_in_cell(node1_index_in_cell) * dims_x + j;
-                                if (col < row) continue;
+                            if (node0_index_in_cell < num_nodes_in_cell) {
+                                int row = nodes_in_cell(node0_index_in_cell) * dims_x + i;
+                                if (node1_index_in_cell < num_nodes_in_cell) {
+                                    int col = nodes_in_cell(node1_index_in_cell) * dims_x + j;
+                                    if (col < row) continue;
 
-                                local_triplets_d2Fdx2.emplace_back(
-                                    row, col,
-                                    cell_energy_hessian.coeff(node0_index_in_cell * dims_x + i,
-                                                              node1_index_in_cell * dims_x + j));
-                            }
-                        } else {
-                            int row = cell.site_index * dims_c + i;
-                            if (node1_index_in_cell < num_nodes_in_cell) {
-                                int col = nodes_in_cell(node1_index_in_cell) * dims_x + j;
-                                local_triplets_d2Fdcdx.emplace_back(
-                                    row, col,
-                                    cell_energy_hessian.coeff(num_nodes_in_cell * dims_x + i,
-                                                              node1_index_in_cell * dims_x + j));
+                                    local_triplets_d2Fdx2.emplace_back(
+                                        row, col,
+                                        cell_energy_hessian.coeff(node0_index_in_cell * dims_x + i,
+                                                                  node1_index_in_cell * dims_x + j));
+                                }
                             } else {
-                                int col = cell.site_index * dims_c + j;
-                                if (col < row) continue;
-                                // d2Fdc2 added directly
-                                local_triplets_d2Fdc2.emplace_back(
-                                    row, col,
-                                    cell_energy_hessian.coeff(num_nodes_in_cell * dims_x + i,
-                                                              num_nodes_in_cell * dims_x + j));
+                                int row = cell.site_index * dims_c + i;
+                                if (node1_index_in_cell < num_nodes_in_cell) {
+                                    int col = nodes_in_cell(node1_index_in_cell) * dims_x + j;
+                                    local_triplets_d2Fdcdx.emplace_back(
+                                        row, col,
+                                        cell_energy_hessian.coeff(num_nodes_in_cell * dims_x + i,
+                                                                  node1_index_in_cell * dims_x + j));
+                                } else {
+                                    int col = cell.site_index * dims_c + j;
+                                    if (col < row) continue;
+                                    // d2Fdc2 added directly
+                                    local_triplets_d2Fdc2.emplace_back(
+                                        row, col,
+                                        cell_energy_hessian.coeff(num_nodes_in_cell * dims_x + i,
+                                                                  num_nodes_in_cell * dims_x + j));
+                                }
                             }
                         }
                     }
                 }
             }
-        }
 
-        // Safely append the local vector to the concurrent vector
-        triplets_dFdx.grow_by(local_triplets_dFdx.begin(), local_triplets_dFdx.end());
-        triplets_dFdc.grow_by(local_triplets_dFdc.begin(), local_triplets_dFdc.end());
-        triplets_d2Fdc2.grow_by(local_triplets_d2Fdc2.begin(), local_triplets_d2Fdc2.end());
-        triplets_d2Fdcdx.grow_by(local_triplets_d2Fdcdx.begin(), local_triplets_d2Fdcdx.end());
-        triplets_d2Fdx2.grow_by(local_triplets_d2Fdx2.begin(), local_triplets_d2Fdx2.end());
-    });
+            // Safely append the local vector to the concurrent vector
+            triplets_dFdx.grow_by(local_triplets_dFdx.begin(), local_triplets_dFdx.end());
+            triplets_dFdc.grow_by(local_triplets_dFdc.begin(), local_triplets_dFdc.end());
+            triplets_d2Fdc2.grow_by(local_triplets_d2Fdc2.begin(), local_triplets_d2Fdc2.end());
+            triplets_d2Fdcdx.grow_by(local_triplets_d2Fdcdx.begin(), local_triplets_d2Fdcdx.end());
+            triplets_d2Fdx2.grow_by(local_triplets_d2Fdx2.begin(), local_triplets_d2Fdx2.end());
+        });
 
     energy = 0;
     for (F e : cell_energies) {
