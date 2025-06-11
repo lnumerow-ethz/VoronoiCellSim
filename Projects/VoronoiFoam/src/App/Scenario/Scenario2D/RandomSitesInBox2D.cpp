@@ -31,7 +31,7 @@ bool RandomSitesInBox2D::generateScenario(ModelDefinition &model_definition,
         }
     }
 
-    degrees_of_freedom.boundary_param = VectorXF::Constant(num_param, 5.0);
+    degrees_of_freedom.boundary_param = VectorXF::Constant(num_param, 7.0);
     return success;
 }
 
